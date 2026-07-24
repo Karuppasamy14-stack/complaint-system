@@ -1,215 +1,138 @@
-from flask import Flask, render_template, request, redirect, session, flash
-import sqlite3, os
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, redirect, session
+import sqlite3
 
 app = Flask(__name__)
-app.secret_key = "secret"
+app.secret_key = "secret123"
 
-UPLOAD_FOLDER = "static/uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-# ---------- DATABASE ----------
-def init_db():
+# ---------------- DATABASE ----------------
+def get_db():
     conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY,
-        username TEXT,
-        password TEXT,
-        role TEXT
-    )
-    """)
+# ---------------- HOME (FIXED) ----------------
+@app.route('/')
+def home():
+    return redirect('/login')
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS complaints(
-        id INTEGER PRIMARY KEY,
-        user TEXT,
-        issue TEXT,
-        status TEXT,
-        staff TEXT,
-        image TEXT,
-        notify TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ---------- LOGIN ----------
-@app.route("/", methods=["GET","POST"])
-def login():
-    if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
-
-        conn = sqlite3.connect("database.db")
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username=?", (u,))
-        data = cur.fetchone()
-        conn.close()
-
-        if data and check_password_hash(data[2], p):
-            session["user"] = u
-            session["role"] = data[3]
-
-            if data[3] == "admin":
-                return redirect("/admin")
-            elif data[3] == "staff":
-                return redirect("/staff")
-            else:
-                return redirect("/dashboard")
-        else:
-            flash("Invalid login")
-
-    return render_template("login.html")
-
-# ---------- REGISTER ----------
-@app.route("/register", methods=["GET","POST"])
+# ---------------- REGISTER ----------------
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == "POST":
-        u = request.form["username"]
-        p = generate_password_hash(request.form["password"])
-        r = request.form["role"]
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
 
-        conn = sqlite3.connect("database.db")
-        cur = conn.cursor()
-        cur.execute("INSERT INTO users VALUES(NULL,?,?,?)",(u,p,r))
+        conn = get_db()
+        conn.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                     (username, password, "student"))
         conn.commit()
         conn.close()
 
-        return redirect("/")
+        return redirect('/login')
 
-    return render_template("register.html")
+    return render_template('register.html')
 
-# ---------- DASHBOARD ----------
-@app.route("/dashboard")
+# ---------------- LOGIN ----------------
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db()
+        user = conn.execute("SELECT * FROM users WHERE username=? AND password=?",
+                            (username, password)).fetchone()
+        conn.close()
+
+        if user:
+            session['user'] = user['username']
+            session['role'] = user['role']
+
+            if user['role'] == 'admin':
+                return redirect('/admin')
+            elif user['role'] == 'staff':
+                return redirect('/staff')
+            else:
+                return redirect('/dashboard')
+
+    return render_template('login.html')
+
+# ---------------- DASHBOARD ----------------
+@app.route('/dashboard')
 def dashboard():
+    conn = get_db()
 
-    if "user" not in session:
-        return redirect("/")
-
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
-
-    # counts
-    cur.execute("SELECT COUNT(*) FROM complaints")
-    total = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM complaints WHERE status='Pending'")
-    pending = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM complaints WHERE status='In Progress'")
-    progress = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM complaints WHERE status='Resolved'")
-    resolved = cur.fetchone()[0]
+    total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
+    pending = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Pending'").fetchone()[0]
+    progress = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='In Progress'").fetchone()[0]
+    resolved = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Resolved'").fetchone()[0]
 
     conn.close()
 
-    return render_template(
-        "dashboard.html",
-        total=total,
-        pending=pending,
-        progress=progress,
-        resolved=resolved
-    )
+    return render_template('dashboard.html',
+                           total=total,
+                           pending=pending,
+                           progress=progress,
+                           resolved=resolved)
 
-# ---------- COMPLAINT ----------
-@app.route("/complaint", methods=["GET","POST"])
+# ---------------- ADD COMPLAINT ----------------
+@app.route('/complaint', methods=['GET', 'POST'])
 def complaint():
+    if request.method == 'POST':
+        problem = request.form['problem']
+        user = session.get('user')
 
-    if "user" not in session:
-        return redirect("/")
-
-    if request.method == "POST":
-        issue = request.form["issue"]
-        file = request.files.get("image")
-
-        filename = ""
-        if file and file.filename:
-            filename = file.filename
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-
-        conn = sqlite3.connect("database.db")
-        cur = conn.cursor()
-
-        cur.execute("""
-        INSERT INTO complaints VALUES(NULL,?,?,?,?,?,?)
-        """, (session["user"], issue, "Pending", "", filename, "New Complaint"))
-
+        conn = get_db()
+        conn.execute("INSERT INTO complaints (user, problem, status) VALUES (?, ?, ?)",
+                     (user, problem, "Pending"))
         conn.commit()
         conn.close()
 
-        flash("Complaint submitted!")
-        return redirect("/dashboard")
+        return redirect('/dashboard')
 
-    return render_template("complaint.html")
+    return render_template('complaint.html')
 
-# ---------- ADMIN ----------
-@app.route("/admin", methods=["GET","POST"])
+# ---------------- ADMIN ----------------
+@app.route('/admin', methods=['GET', 'POST'])
 def admin():
+    conn = get_db()
 
-    if "role" not in session or session["role"] != "admin":
-        return "Access Denied"
+    if request.method == 'POST':
+        complaint_id = request.form['id']
+        staff = request.form['staff']
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
-
-    if request.method == "POST":
-        cid = request.form["id"]
-        staff = request.form["staff"]
-
-        cur.execute("""
-        UPDATE complaints 
-        SET staff=?, status='In Progress', notify='Assigned to staff'
-        WHERE id=?
-        """, (staff, cid))
-
+        conn.execute("UPDATE complaints SET assigned_to=?, status='In Progress' WHERE id=?",
+                     (staff, complaint_id))
         conn.commit()
 
-    cur.execute("SELECT * FROM complaints")
-    data = cur.fetchall()
+    complaints = conn.execute("SELECT * FROM complaints").fetchall()
     conn.close()
 
-    return render_template("admin.html", data=data)
+    return render_template('admin.html', complaints=complaints)
 
-# ---------- STAFF ----------
-@app.route("/staff", methods=["GET","POST"])
+# ---------------- STAFF ----------------
+@app.route('/staff', methods=['GET', 'POST'])
 def staff():
+    conn = get_db()
 
-    if "role" not in session or session["role"] != "staff":
-        return "Access Denied"
+    if request.method == 'POST':
+        complaint_id = request.form['id']
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
-
-    if request.method == "POST":
-        cid = request.form["id"]
-
-        cur.execute("""
-        UPDATE complaints 
-        SET status='Resolved', notify='Resolved by staff'
-        WHERE id=?
-        """, (cid,))
-
+        conn.execute("UPDATE complaints SET status='Resolved' WHERE id=?",
+                     (complaint_id,))
         conn.commit()
 
-    cur.execute("SELECT * FROM complaints")
-    data = cur.fetchall()
+    complaints = conn.execute("SELECT * FROM complaints WHERE status='In Progress'").fetchall()
     conn.close()
 
-    return render_template("staff.html", data=data)
+    return render_template('staff.html', complaints=complaints)
 
-# ---------- LOGOUT ----------
-@app.route("/logout")
+# ---------------- LOGOUT ----------------
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect("/")
+    return redirect('/login')
 
-# ---------- RUN ----------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
