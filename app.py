@@ -10,7 +10,7 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-# ---------------- HOME (FIXED) ----------------
+# ---------------- HOME ----------------
 @app.route('/')
 def home():
     return redirect('/login')
@@ -19,12 +19,14 @@ def home():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
 
         conn = get_db()
-        conn.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                     (username, password, "student"))
+        conn.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            (username, password, "student")
+        )
         conn.commit()
         conn.close()
 
@@ -36,12 +38,14 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
 
         conn = get_db()
-        user = conn.execute("SELECT * FROM users WHERE username=? AND password=?",
-                            (username, password)).fetchone()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
         conn.close()
 
         if user:
@@ -54,6 +58,8 @@ def login():
                 return redirect('/staff')
             else:
                 return redirect('/dashboard')
+
+        return "Invalid Login"
 
     return render_template('login.html')
 
@@ -79,16 +85,28 @@ def dashboard():
 @app.route('/complaint', methods=['GET', 'POST'])
 def complaint():
     if request.method == 'POST':
-        problem = request.form['problem']
-        user = session.get('user')
+        try:
+            problem = request.form.get('problem')
+            user = session.get('user')
 
-        conn = get_db()
-        conn.execute("INSERT INTO complaints (user, problem, status) VALUES (?, ?, ?)",
-                     (user, problem, "Pending"))
-        conn.commit()
-        conn.close()
+            if not problem or problem.strip() == "":
+                return "⚠️ Please enter a complaint"
 
-        return redirect('/dashboard')
+            if not user:
+                return redirect('/login')
+
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO complaints (user, problem, status) VALUES (?, ?, ?)",
+                (user, problem, "Pending")
+            )
+            conn.commit()
+            conn.close()
+
+            return redirect('/dashboard')
+
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('complaint.html')
 
@@ -98,11 +116,13 @@ def admin():
     conn = get_db()
 
     if request.method == 'POST':
-        complaint_id = request.form['id']
-        staff = request.form['staff']
+        complaint_id = request.form.get('id')
+        staff = request.form.get('staff')
 
-        conn.execute("UPDATE complaints SET assigned_to=?, status='In Progress' WHERE id=?",
-                     (staff, complaint_id))
+        conn.execute(
+            "UPDATE complaints SET assigned_to=?, status='In Progress' WHERE id=?",
+            (staff, complaint_id)
+        )
         conn.commit()
 
     complaints = conn.execute("SELECT * FROM complaints").fetchall()
@@ -116,13 +136,18 @@ def staff():
     conn = get_db()
 
     if request.method == 'POST':
-        complaint_id = request.form['id']
+        complaint_id = request.form.get('id')
 
-        conn.execute("UPDATE complaints SET status='Resolved' WHERE id=?",
-                     (complaint_id,))
+        conn.execute(
+            "UPDATE complaints SET status='Resolved' WHERE id=?",
+            (complaint_id,)
+        )
         conn.commit()
 
-    complaints = conn.execute("SELECT * FROM complaints WHERE status='In Progress'").fetchall()
+    complaints = conn.execute(
+        "SELECT * FROM complaints WHERE status='In Progress'"
+    ).fetchall()
+
     conn.close()
 
     return render_template('staff.html', complaints=complaints)
