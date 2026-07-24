@@ -10,6 +10,33 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+# 🔥 AUTO CREATE TABLES
+@app.before_first_request
+def create_tables():
+    conn = sqlite3.connect("database.db")
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        password TEXT,
+        role TEXT
+    )
+    """)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS complaints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user TEXT,
+        problem TEXT,
+        status TEXT,
+        assigned_to TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
 # ---------------- HOME ----------------
 @app.route('/')
 def home():
