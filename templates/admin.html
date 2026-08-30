@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #0f2027;
+    color: white;
+}
+
+.container {
+    width: 95%;
+    margin: auto;
+    overflow-x: auto;  /* 🔥 mobile scroll */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px; /* 🔥 important */
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    text-align: left;
+}
+
+th {
+    background: #00ffcc;
+    color: black;
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <h3>Admin Panel</h3>
+    <a href="/logout" class="logout">Logout</a>
+</div>
+
+<h2>Complaints Dashboard 🚀</h2>
+
+<div class="container">
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Problem</th>
+        <th>Action</th>
+    </tr>
+
+    {% for row in data %}
+    <tr>
+        <td>{{ row[0] }}</td>
+        <td>{{ row[1] }}</td>
+        <td>{{ row[2] }}</td>
+        <td>
+            <a class="delete-btn" href="/delete/{{ row[0] }}">Delete</a>
+        </td>
+    </tr>
+    {% endfor %}
+
+</table>
+</div>
+
+</body>
+</html>

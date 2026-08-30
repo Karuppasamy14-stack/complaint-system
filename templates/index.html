@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complaint System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: linear-gradient(135deg, #1f1f1f, #000);
+    color: white;
+}
+
+.box {
+    background: #222;
+    padding: 20px;
+    width: 90%;
+    max-width: 350px;
+    margin: auto;
+    margin-top: 80px;
+    border-radius: 10px;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 5px;
+}
+
+button {
+    background: #00ffcc;
+    border: none;
+    padding: 12px;
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 5px;
+}
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Submit Complaint 🚨</h2>
+
+    <form method="POST">
+        <input type="text" name="name" placeholder="Your Name" required>
+        <textarea name="problem" placeholder="Enter your problem" required></textarea>
+        <button type="submit">Submit</button>
+    </form>
+
+    <br>
+    <a href="/login">Admin Login</a>
+</div>
+
+</body>
+</html>
